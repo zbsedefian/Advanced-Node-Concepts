@@ -1,0 +1,24 @@
+{
+  "name": "AdvNode",
+  "version": "1.0.0",
+  "description": "Node runs on two dependencies: V8 (a google runtime which interprets and executes JS code) and libuv (a C++ wrapper that allows access to syscalls).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zbsedefian/Advanced-Node-Concepts.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zbsedefian/Advanced-Node-Concepts/issues"
+  },
+  "homepage": "https://github.com/zbsedefian/Advanced-Node-Concepts#readme",
+  "dependencies": {
+    "express": "^4.16.3",
+    "webworker-threads": "^0.7.17"
+  }
+}
