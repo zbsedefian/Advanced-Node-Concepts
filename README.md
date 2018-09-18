@@ -70,3 +70,75 @@ npm i --save webworker-threads
 </pre>
 
 Closures must use postMessage and onMessage. See index_worker.js.
+
+# Data caching with Redis
+
+A query hits a mongodb's index, which holds the index of a record.
+The index can be, for example, an id property.
+However, if the query is looking for a specific title, the index doesn't know where to look, so a full collection scan is done.
+This will cause performance issues.
+
+One solution is to have multiple indices. The problem is, it takes longer to write a new record since it must be indexed more than once. On a large scale, the multiple index solution creates performance issues as well.
+
+Caching is a good solution. A cache server checks if the exact query has been issued before. If it hasn't, it then queries MongoDB, and then stores that result in its cache. If it has seen it, the cache server itself serves the data to mongoose.
+
+For example, in a blogRoutes.js file
+<pre>
+app.get('/api/blogs', requireLogin, async (req, res) => {
+    const redis = require('redis');
+    const redisUrl = 'redis://127.0.0.1:6379';
+    const client = redis.createClient(redisUrl);
+    // since client.get() returns a callback function, promisify it
+    const util = require('util');
+    client.get = util.promisify(client.get);
+    
+    // Do we have any cached data related to redis?
+    const cachedBlogs = await client.get(req.user.id);
+
+    // If yes, respond to request right away
+    if (cachedBlogs) {
+      return res.send(JSON.parse(cachedBlogs));
+    } 
+
+    // If no, query regularly, then update cache to store data
+    const blogs = await Blog.find({ _user: req.user.id });
+    res.send(blogs);
+    client.set(req.user.id, JSON.stringify(blogs));
+});
+</pre>
+
+Issues:
+1) Caching code not reusable --> Hook in to Mongoose's query generation and execeution process.
+2) Cached values never expire --> add timeout to values assigned to redis. Add ability to reset all values tied to event.
+3) Cached keys won't work when we introduce other collections or query options --> Figure out a more robust solutionfor generating cache keys.
+
+Solutions:
+1) const query = Person.find etc. etc.
+   // Check if already cached in redis
+   // Do so by overwriting query.exec 
+   <pre>
+   query.exec = function() {
+      const result = client.get('query key')
+      if (result) {
+          return result; 
+      }
+      const result = runtheOriginalExecFunction();
+      client.set('query key', result)
+      return result;
+   }
+   </pre>
+
+2) Has built-in option: client.set('color', 'red', 'EX', 5) // expire after 5 seconds. 
+In the blog example, when you create a new post, you're going to want to reset all values tied to redis in order to see the updated list.
+
+3) query.getOptions() will return something like { find: { occupation: 'host' }, where: [{'name.last': 'Ghost' } ] }  etc.
+Turn options into a string which will act as a key.
+
+Do this by stringifying this.getQuery() (which will be an id) with this.mongooseCollection.name
+<pre>
+    const key = JSON.stringify(
+        Object.assign({}, this.getQuery(), {
+        collection: this.mongooseCollection.name
+        })
+    )
+</pre>
